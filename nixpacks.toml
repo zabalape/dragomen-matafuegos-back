@@ -1,0 +1,12 @@
+[env]
+PORT = "3001"
+NODE_ENV = "production"
+
+[phases.build]
+commands = [
+  "npm ci",
+  "npm run build"
+]
+
+[phases.start]
+command = "npm run start:prod"
