@@ -48,6 +48,28 @@ export class DirectusService {
     });
   }
 
+  async listCollections(): Promise<Array<{ collection: string }>> {
+    return this.request<Array<{ collection: string }>>('/collections', {
+      method: 'GET',
+    });
+  }
+
+  async createCollection(collection: {
+    collection: string;
+    fields: Array<{
+      field: string;
+      type: string;
+      meta?: Record<string, unknown>;
+      schema?: Record<string, unknown>;
+    }>;
+    meta?: Record<string, unknown>;
+  }): Promise<{ collection: string }> {
+    return this.request<{ collection: string }>('/collections', {
+      method: 'POST',
+      body: collection,
+    });
+  }
+
   private async request<T>(
     path: string,
     options: {

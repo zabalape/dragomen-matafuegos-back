@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { DirectusInitializationService } from './directus/directus-initialization.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -24,6 +25,10 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Inicializar colecciones en Directus
+  const directusInit = app.get(DirectusInitializationService);
+  await directusInit.initializeCollections();
 
   await app.listen(process.env.PORT ?? 3001);
 }
