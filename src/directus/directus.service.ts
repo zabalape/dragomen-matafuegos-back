@@ -70,6 +70,47 @@ export class DirectusService {
     });
   }
 
+  async listRoles(): Promise<Array<{ id: string; name: string }>> {
+    return this.request<Array<{ id: string; name: string }>>('/roles', {
+      method: 'GET',
+    });
+  }
+
+  async createPermission(permission: {
+    role: string;
+    collection: string;
+    action: 'create' | 'read' | 'update' | 'delete';
+    fields?: string[];
+    presets?: Record<string, unknown>;
+    validation?: Record<string, unknown>;
+  }): Promise<{ id: number }> {
+    return this.request<{ id: number }>('/permissions', {
+      method: 'POST',
+      body: permission,
+    });
+  }
+
+  async listPermissions(query?: QueryParams): Promise<
+    Array<{
+      id: number;
+      role: string;
+      collection: string;
+      action: string;
+    }>
+  > {
+    return this.request<
+      Array<{
+        id: number;
+        role: string;
+        collection: string;
+        action: string;
+      }>
+    >('/permissions', {
+      method: 'GET',
+      query,
+    });
+  }
+
   private async request<T>(
     path: string,
     options: {

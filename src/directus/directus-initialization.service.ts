@@ -29,6 +29,17 @@ export class DirectusInitializationService {
       }
     }
 
+    // Configurar permisos para las colecciones
+    try {
+      await this.configurePermissions(collections);
+    } catch (error) {
+      this.logger.error(
+        'Error al configurar permisos:',
+        error,
+      );
+      throw error;
+    }
+
     this.logger.log('Sincronización de colecciones completada exitosamente');
   }
 
@@ -74,6 +85,74 @@ export class DirectusInitializationService {
         return;
       }
       throw error;
+    }
+  }
+
+  private async configurePermissions(
+    collections: Array<{ collection: string }>,
+  ): Promise<void> {
+    this.logger.log('Configurando permisos para colecciones...');
+
+    try {
+      const roles = await this.directusService.listRoles();
+      const actions: Array<'create' | 'read' | 'update' | 'delete'> = [
+        'create',
+        'read',
+        'update',
+        'delete',
+      ];
+
+      for (const role of roles) {
+        // Obtener permisos existentes para este rol
+        const existingPermissions = await this.directusService.listPermissions({
+          'filter[role]': role.id,
+        });
+
+        for (const collection of collections) {
+          for (const action of actions) {
+            const permissionExists = existingPermissions.some(
+              (p) =>
+                p.role === role.id &&
+                p.collection === collection.collection &&
+                p.action === action,
+            );
+
+            if (!permissionExists) {
+              try {
+                await this.directusService.createPermission({
+                  role: role.id,
+                  collection: collection.collection,
+                  action,
+                });
+                this.logger.log(
+                  `Permiso "${action}" asignado para "${collection.collection}" en rol "${role.name}"`,
+                );
+              } catch (error) {
+                const errorMessage =
+                  error instanceof Error ? error.message : String(error);
+                if (!errorMessage.includes('already exists')) {
+                  this.logger.warn(
+                    `No se pudo crear permiso ${action} para ${collection.collection} en rol ${role.name}:`,
+                    errorMessage,
+                  );
+                }
+              }
+            } else {
+              this.logger.debug(
+                `Permiso "${action}" ya existe para "${collection.collection}" en rol "${role.name}"`,
+              );
+            }
+          }
+        }
+      }
+
+      this.logger.log('Permisos configurados exitosamente');
+    } catch (error) {
+      this.logger.warn(
+        'Advertencia al configurar permisos (puede ser normal si el token no tiene permisos de admin):',
+        error instanceof Error ? error.message : String(error),
+      );
+      // No lanzamos error aquí porque puede ser normal que falte acceso a roles/permisos
     }
   }
 
