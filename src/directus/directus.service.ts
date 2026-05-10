@@ -111,10 +111,23 @@ export class DirectusService {
     });
   }
 
+  async updateCollection(
+    collection: string,
+    data: Record<string, unknown>,
+  ): Promise<{ collection: string }> {
+    return this.request<{ collection: string }>(
+      `/collections/${collection}`,
+      {
+        method: 'PATCH' as any,
+        body: data,
+      },
+    );
+  }
+
   private async request<T>(
     path: string,
     options: {
-      method: 'GET' | 'POST';
+      method: 'GET' | 'POST' | 'PATCH';
       query?: QueryParams;
       body?: object;
     },
