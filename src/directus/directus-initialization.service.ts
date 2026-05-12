@@ -52,12 +52,11 @@ export class DirectusInitializationService {
 
       this.logger.log(`Creando colección "${collectionDef.collection}"...`);
       
-      // Forzamos que la colección sea visible en el panel administrativo
       const payload = {
         ...collectionDef,
         meta: {
           ...collectionDef.meta,
-          hidden: false, // CLAVE: Si es true, no aparece en el menú
+          hidden: false, 
           singleton: false,
         },
       };
@@ -78,21 +77,24 @@ export class DirectusInitializationService {
       const actions: Array<'create' | 'read' | 'update' | 'delete'> = ['create', 'read', 'update', 'delete'];
 
       for (const role of roles) {
-        // Omitimos el rol de Admin (ya tiene todo)
+        // Omitimos el rol de Admin (ya tiene todo por defecto)
         if (role.name?.toLowerCase().includes('admin')) continue;
 
         for (const col of collections) {
           for (const action of actions) {
             try {
+              // CAMBIO CLAVE: Se eliminó la propiedad 'permissions' que causaba el error TS2353
+              // En su lugar, usamos 'fields: ["*"]' para permitir acceso a todas las columnas
               await this.directusService.createPermission({
                 role: role.id,
                 collection: col.collection,
                 action,
-                permissions: {}, // Permisos completos sin restricciones
+                fields: ['*'], 
                 validation: {},
+                presets: {},
               });
             } catch (e) {
-              // Ignorar si ya existe
+              // Ignorar errores si el permiso ya existe durante la re-inicialización
             }
           }
         }
@@ -178,7 +180,6 @@ export class DirectusInitializationService {
     };
   }
 
-  // Helper para el campo ID que Directus requiere para que funcione el Admin
   private primaryKeyField() {
     return {
       field: 'id',

@@ -4,7 +4,7 @@ import { DirectusInitializationService } from './directus-initialization.service
 
 @Global()
 @Module({
-  providers: [DirectusService],
-  exports: [DirectusService],
+  providers: [DirectusService, DirectusInitializationService],
+  exports: [DirectusService, DirectusInitializationService],
 })
 export class DirectusModule {}
