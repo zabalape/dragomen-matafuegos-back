@@ -42,7 +42,7 @@ export class DirectusInitializationService {
     try {
       const existingCollections = await this.directusService.listCollections();
       const exists = existingCollections.some(
-        (c) => c.collection === collectionDef.collection,
+        (c: any) => c.collection === collectionDef.collection,
       );
 
       if (exists) {
@@ -52,17 +52,21 @@ export class DirectusInitializationService {
 
       this.logger.log(`Creando colección "${collectionDef.collection}"...`);
       
+      // Estructura completa para asegurar que Directus registre la colección en sus metadatos internos
       const payload = {
-        ...collectionDef,
+        collection: collectionDef.collection,
+        schema: {}, // Obligatorio para crear la tabla física
         meta: {
-          ...collectionDef.meta,
-          hidden: false, 
+          icon: collectionDef.meta.icon,
+          display_template: collectionDef.meta.display_template,
+          hidden: false,
           singleton: false,
         },
+        fields: collectionDef.fields,
       };
 
       await this.directusService.createCollection(payload);
-      this.logger.log(`Colección "${collectionDef.collection}" creada y visible.`);
+      this.logger.log(`Colección "${collectionDef.collection}" creada y activada.`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('already exists')) return;
@@ -77,14 +81,12 @@ export class DirectusInitializationService {
       const actions: Array<'create' | 'read' | 'update' | 'delete'> = ['create', 'read', 'update', 'delete'];
 
       for (const role of roles) {
-        // Omitimos el rol de Admin (ya tiene todo por defecto)
         if (role.name?.toLowerCase().includes('admin')) continue;
 
         for (const col of collections) {
           for (const action of actions) {
             try {
-              // CAMBIO CLAVE: Se eliminó la propiedad 'permissions' que causaba el error TS2353
-              // En su lugar, usamos 'fields: ["*"]' para permitir acceso a todas las columnas
+              // SOLUCIÓN AL ERROR TS2353: Se eliminó 'permissions' y se usa 'fields'
               await this.directusService.createPermission({
                 role: role.id,
                 collection: col.collection,
@@ -94,13 +96,13 @@ export class DirectusInitializationService {
                 presets: {},
               });
             } catch (e) {
-              // Ignorar errores si el permiso ya existe durante la re-inicialización
+              // Silenciamos si el permiso ya existe
             }
           }
         }
       }
     } catch (error) {
-      this.logger.warn('No se pudieron auto-configurar todos los permisos. Revisa manualmente en el panel.');
+      this.logger.warn('No se pudieron configurar todos los permisos automáticamente.');
     }
   }
 
@@ -146,7 +148,7 @@ export class DirectusInitializationService {
         { field: 'stock', type: 'integer', meta: { interface: 'input' } },
         { field: 'descripcion', type: 'text', meta: { interface: 'wysiwyg' } },
         { field: 'destacado', type: 'boolean', meta: { interface: 'boolean' } },
-        { field: 'imagenId', type: 'string', meta: { interface: 'input', note: 'ID del archivo' } },
+        { field: 'imagenId', type: 'string', meta: { interface: 'input' } },
       ],
     };
   }
@@ -184,15 +186,8 @@ export class DirectusInitializationService {
     return {
       field: 'id',
       type: 'uuid',
-      meta: {
-        interface: 'input',
-        hidden: true,
-        readonly: true,
-      },
-      schema: {
-        is_primary_key: true,
-        has_auto_increment: false,
-      },
+      meta: { interface: 'input', hidden: true, readonly: true },
+      schema: { is_primary_key: true, has_auto_increment: false },
     };
   }
 }
