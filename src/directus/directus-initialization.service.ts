@@ -52,10 +52,9 @@ export class DirectusInitializationService {
 
       this.logger.log(`Creando colección "${collectionDef.collection}"...`);
       
-      // Estructura completa para asegurar que Directus registre la colección en sus metadatos internos
       const payload = {
         collection: collectionDef.collection,
-        schema: {}, // Obligatorio para crear la tabla física
+        schema: {}, 
         meta: {
           icon: collectionDef.meta.icon,
           display_template: collectionDef.meta.display_template,
@@ -86,7 +85,6 @@ export class DirectusInitializationService {
         for (const col of collections) {
           for (const action of actions) {
             try {
-              // SOLUCIÓN AL ERROR TS2353: Se eliminó 'permissions' y se usa 'fields'
               await this.directusService.createPermission({
                 role: role.id,
                 collection: col.collection,
@@ -96,7 +94,7 @@ export class DirectusInitializationService {
                 presets: {},
               });
             } catch (e) {
-              // Silenciamos si el permiso ya existe
+              // Ignorar si ya existe
             }
           }
         }
@@ -106,7 +104,7 @@ export class DirectusInitializationService {
     }
   }
 
-  // --- Definiciones de Colecciones ---
+  // --- Definiciones basadas en tus tipos ---
 
   private getLeadsCollection() {
     return {
@@ -117,19 +115,8 @@ export class DirectusInitializationService {
         { field: 'nombre', type: 'string', meta: { interface: 'input' } },
         { field: 'telefono', type: 'string', meta: { interface: 'input' } },
         { field: 'consulta', type: 'text', meta: { interface: 'input-multiline' } },
-        {
-          field: 'origen',
-          type: 'string',
-          meta: {
-            interface: 'select-dropdown',
-            options: {
-              choices: [
-                { text: 'Contacto Web', value: 'contacto_web' },
-                { text: 'Redes Sociales', value: 'redes_sociales' },
-              ],
-            },
-          },
-        },
+        { field: 'origen', type: 'string', meta: { interface: 'input' } },
+        { field: 'marcaTemporal', type: 'timestamp', meta: { interface: 'datetime' } },
       ],
     };
   }
@@ -148,7 +135,15 @@ export class DirectusInitializationService {
         { field: 'stock', type: 'integer', meta: { interface: 'input' } },
         { field: 'descripcion', type: 'text', meta: { interface: 'wysiwyg' } },
         { field: 'destacado', type: 'boolean', meta: { interface: 'boolean' } },
-        { field: 'imagenId', type: 'string', meta: { interface: 'input' } },
+        { 
+          field: 'imagen', 
+          type: 'uuid', 
+          meta: { 
+            interface: 'file',
+            note: 'Relación con directus_files'
+          },
+          schema: { foreign_key_table: 'directus_files', foreign_key_column: 'id' }
+        },
       ],
     };
   }
@@ -162,7 +157,6 @@ export class DirectusInitializationService {
         { field: 'slug', type: 'string', meta: { interface: 'input-slug' } },
         { field: 'titulo', type: 'string', meta: { interface: 'input' } },
         { field: 'resumen', type: 'text', meta: { interface: 'input-multiline' } },
-        { field: 'contenido', type: 'text', meta: { interface: 'wysiwyg' } },
         { field: 'fechaPublicacion', type: 'timestamp', meta: { interface: 'datetime' } },
       ],
     };
