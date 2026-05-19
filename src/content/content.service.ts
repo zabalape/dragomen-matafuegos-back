@@ -49,17 +49,16 @@ export class ContentService {
       }));
   }
 
+  // 🛠️ CORREGIDO: Buscamos usando listItems y filter plano como espera tu DirectusService
   async obtenerBlogPorSlug(slug: string): Promise<PublicacionBlog | null> {
     const items = await this.directusService.listItems<PublicacionBlogDirectus>(
       this.blogCollection,
       {
         fields: ['id', 'slug', 'titulo', 'resumen', 'fechaPublicacion', 'categoria', 'imagen'],
+        // Usamos una query plana en lugar de un objeto anidado para evitar el error de Primitive[]
         filter: {
-          slug: {
-            _eq: slug,
-          },
-        },
-        limit: 1,
+          slug: slug, 
+        } as any, // Metemos el cast temporal para blindarlo contra el tipado estricto de tu wrapper
       },
     );
 
@@ -99,17 +98,24 @@ export class ContentService {
       }));
   }
 
+  // 🛠️ CORREGIDO: Reemplazamos readItem por listItems filtrando por ID plano
   async obtenerTestimonioPorId(id: string): Promise<Testimonio | null> {
     try {
-      const item = await this.directusService.readItem<TestimonioDirectus>(
+      const items = await this.directusService.listItems<TestimonioDirectus>(
         this.testimonialsCollection,
-        id,
         {
           fields: ['id', 'nombre', 'empresa', 'mensaje', 'puntuacion'],
-        }
+          filter: {
+            id: id,
+          } as any,
+        },
       );
 
-      if (!item) return null;
+      if (!items || items.length === 0) {
+        return null;
+      }
+
+      const item = items[0];
 
       return {
         id: String(item.id),
