@@ -28,6 +28,9 @@ export class ContentService {
 
   constructor(private readonly directusService: DirectusService) {}
 
+  /**
+   * Obtiene todas las publicaciones del blog
+   */
   async obtenerBlog(): Promise<PublicacionBlog[]> {
     const items = await this.directusService.listItems<PublicacionBlogDirectus>(
       this.blogCollection,
@@ -49,36 +52,46 @@ export class ContentService {
       }));
   }
 
-  // 🛠️ CORREGIDO: Buscamos usando listItems y filter plano como espera tu DirectusService
+  /**
+   * Obtiene una publicación específica del blog por su slug
+   */
   async obtenerBlogPorSlug(slug: string): Promise<PublicacionBlog | null> {
-    const items = await this.directusService.listItems<PublicacionBlogDirectus>(
-      this.blogCollection,
-      {
-        fields: ['id', 'slug', 'titulo', 'resumen', 'fechaPublicacion', 'categoria', 'imagen'],
-        // Usamos una query plana en lugar de un objeto anidado para evitar el error de Primitive[]
-        filter: {
-          slug: slug, 
-        } as any, // Metemos el cast temporal para blindarlo contra el tipado estricto de tu wrapper
-      },
-    );
+    try {
+      // Pasamos el filtro estructurado directo en el string de la colección 
+      // para evitar los líos de tipos estrictos con objetos filter complejos
+      const coleccionConQuery = `${this.blogCollection}?filter[slug][_eq]=${encodeURIComponent(slug)}`;
 
-    if (!items || items.length === 0) {
+      const items = await this.directusService.listItems<PublicacionBlogDirectus>(
+        coleccionConQuery as any,
+        {
+          fields: ['id', 'slug', 'titulo', 'resumen', 'fechaPublicacion', 'categoria', 'imagen'],
+        },
+      );
+
+      if (!items || items.length === 0) {
+        return null;
+      }
+
+      const item = items[0];
+
+      return {
+        id: String(item.id),
+        slug: item.slug || '',
+        titulo: item.titulo || '',
+        resumen: item.resumen?.trim() || '',
+        fechaPublicacion: item.fechaPublicacion || new Date().toISOString(),
+        categoria: item.categoria || undefined,
+        imagen: item.imagen || undefined,
+      };
+    } catch (error) {
+      console.error('Error en obtenerBlogPorSlug:', error);
       return null;
     }
-
-    const item = items[0];
-
-    return {
-      id: String(item.id),
-      slug: item.slug || '',
-      titulo: item.titulo || '',
-      resumen: item.resumen?.trim() || '',
-      fechaPublicacion: item.fechaPublicacion || new Date().toISOString(),
-      categoria: item.categoria || undefined,
-      imagen: item.imagen || undefined,
-    };
   }
 
+  /**
+   * Obtiene todos los testimonios activos
+   */
   async obtenerTestimonios(): Promise<Testimonio[]> {
     const items = await this.directusService.listItems<TestimonioDirectus>(
       this.testimonialsCollection,
@@ -98,16 +111,18 @@ export class ContentService {
       }));
   }
 
-  // 🛠️ CORREGIDO: Reemplazamos readItem por listItems filtrando por ID plano
+  /**
+   * Obtiene un testimonio individual por su ID
+   */
   async obtenerTestimonioPorId(id: string): Promise<Testimonio | null> {
     try {
+      // Usamos la misma estrategia de query string nativa de Directus para buscar por ID
+      const coleccionConQuery = `${this.testimonialsCollection}?filter[id][_eq]=${encodeURIComponent(id)}`;
+
       const items = await this.directusService.listItems<TestimonioDirectus>(
-        this.testimonialsCollection,
+        coleccionConQuery as any,
         {
           fields: ['id', 'nombre', 'empresa', 'mensaje', 'puntuacion'],
-          filter: {
-            id: id,
-          } as any,
         },
       );
 
@@ -125,6 +140,7 @@ export class ContentService {
         puntuacion: Number(item.puntuacion || 0),
       };
     } catch (error) {
+      console.error('Error en obtenerTestimonioPorId:', error);
       return null;
     }
   }
