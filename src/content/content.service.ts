@@ -8,6 +8,8 @@ type PublicacionBlogDirectus = {
   titulo?: string;
   resumen?: string;
   fechaPublicacion?: string;
+  categoria?: string;
+  imagen?: string;
 };
 
 type TestimonioDirectus = {
@@ -30,7 +32,7 @@ export class ContentService {
     const items = await this.directusService.listItems<PublicacionBlogDirectus>(
       this.blogCollection,
       {
-        fields: ['id', 'slug', 'titulo', 'resumen', 'fechaPublicacion'],
+        fields: ['id', 'slug', 'titulo', 'resumen', 'fechaPublicacion', 'categoria', 'imagen'],
       },
     );
 
@@ -42,7 +44,40 @@ export class ContentService {
         titulo: item.titulo || '',
         resumen: item.resumen?.trim() || '',
         fechaPublicacion: item.fechaPublicacion || new Date().toISOString(),
+        categoria: item.categoria || undefined,
+        imagen: item.imagen || undefined,
       }));
+  }
+
+  async obtenerBlogPorSlug(slug: string): Promise<PublicacionBlog | null> {
+    const items = await this.directusService.listItems<PublicacionBlogDirectus>(
+      this.blogCollection,
+      {
+        fields: ['id', 'slug', 'titulo', 'resumen', 'fechaPublicacion', 'categoria', 'imagen'],
+        filter: {
+          slug: {
+            _eq: slug,
+          },
+        },
+        limit: 1,
+      },
+    );
+
+    if (!items || items.length === 0) {
+      return null;
+    }
+
+    const item = items[0];
+
+    return {
+      id: String(item.id),
+      slug: item.slug || '',
+      titulo: item.titulo || '',
+      resumen: item.resumen?.trim() || '',
+      fechaPublicacion: item.fechaPublicacion || new Date().toISOString(),
+      categoria: item.categoria || undefined,
+      imagen: item.imagen || undefined,
+    };
   }
 
   async obtenerTestimonios(): Promise<Testimonio[]> {
@@ -62,5 +97,29 @@ export class ContentService {
         mensaje: item.mensaje || '',
         puntuacion: Number(item.puntuacion || 0),
       }));
+  }
+
+  async obtenerTestimonioPorId(id: string): Promise<Testimonio | null> {
+    try {
+      const item = await this.directusService.readItem<TestimonioDirectus>(
+        this.testimonialsCollection,
+        id,
+        {
+          fields: ['id', 'nombre', 'empresa', 'mensaje', 'puntuacion'],
+        }
+      );
+
+      if (!item) return null;
+
+      return {
+        id: String(item.id),
+        nombre: item.nombre || '',
+        empresa: item.empresa?.trim() || '',
+        mensaje: item.mensaje || '',
+        puntuacion: Number(item.puntuacion || 0),
+      };
+    } catch (error) {
+      return null;
+    }
   }
 }
