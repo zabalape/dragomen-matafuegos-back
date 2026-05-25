@@ -47,12 +47,12 @@ export class ProductsService {
     const condiciones: FiltroDirectus[] = [
       {
         slug: {
-          _not_null: true,
+          _nnull: true,
         },
       },
       {
         nombre: {
-          _not_null: true,
+          _nnull: true,
         },
       },
     ];
