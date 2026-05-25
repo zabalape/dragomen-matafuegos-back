@@ -18,6 +18,7 @@ type ProductoDirectus = {
   precioArs?: number;
   stock?: number;
   destacado?: boolean;
+  especificaciones?: string;
 };
 
 type FiltroDirectus = {
