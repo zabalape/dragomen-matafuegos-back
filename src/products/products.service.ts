@@ -12,7 +12,7 @@ type ProductoDirectus = {
   slug?: string;
   nombre?: string;
   marca?: string;
-  imagen?: string | { id?: string | number } | null;
+  imagen?: string;
   categoria?: string;
   descripcion?: string;
   precioArs?: number;
