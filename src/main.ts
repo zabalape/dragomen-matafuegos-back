@@ -5,13 +5,15 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const frontendOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000,http://localhost')
+  const frontendOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+    .replace(/['"]/g, '')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
 
   app.enableCors({
     origin: frontendOrigins,
+    credentials: true,
   });
 
   app.useGlobalPipes(
@@ -25,8 +27,10 @@ async function bootstrap() {
     }),
   );
 
-  
-
-  await app.listen(process.env.PORT ?? 3001);
+  const puerto = process.env.PORT ?? 3001;
+  await app.listen(puerto);
+  console.log(`Backend NestJS corriendo en el puerto: ${puerto}`);
+  console.log('Origenes CORS configurados:', frontendOrigins);
 }
+
 bootstrap();

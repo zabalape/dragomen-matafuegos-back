@@ -29,7 +29,8 @@ export const productosSemilla: Producto[] = [
     nombre: 'Servicio de Recarga y Prueba Hidraulica',
     marca: 'DragoMen',
     categoria: 'servicios',
-    descripcion: 'Mantenimiento certificado para hogares, comercio e industria.',
+    descripcion:
+      'Mantenimiento certificado para hogares, comercio e industria.',
     precioArs: 48500,
     stock: 999,
     destacado: false,

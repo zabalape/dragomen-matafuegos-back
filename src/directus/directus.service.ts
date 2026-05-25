@@ -1,12 +1,21 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 
 type Primitive = string | number | boolean;
-type QueryValue = Primitive | Primitive[];
+type QueryValue =
+  | Primitive
+  | Primitive[]
+  | QueryValue[]
+  | { [key: string]: QueryValue | undefined };
 
 type QueryParams = Record<string, QueryValue | undefined>;
 
 type DirectusResponse<T> = {
   data: T;
+  meta?: {
+    filter_count?: number;
+    total_count?: number;
+    [key: string]: unknown;
+  };
 };
 
 @Injectable()
@@ -32,6 +41,18 @@ export class DirectusService {
     collection: string,
     params: QueryParams = {},
   ): Promise<T[]> {
+    const response = await this.request<T[]>(`/items/${collection}`, {
+      method: 'GET',
+      query: params,
+    });
+
+    return response.data;
+  }
+
+  async listItemsWithMeta<T>(
+    collection: string,
+    params: QueryParams = {},
+  ): Promise<DirectusResponse<T[]>> {
     return this.request<T[]>(`/items/${collection}`, {
       method: 'GET',
       query: params,
@@ -42,16 +63,23 @@ export class DirectusService {
     collection: string,
     payload: TInput,
   ): Promise<TOutput> {
-    return this.request<TOutput>(`/items/${collection}`, {
+    const response = await this.request<TOutput>(`/items/${collection}`, {
       method: 'POST',
       body: payload,
     });
+
+    return response.data;
   }
 
   async listCollections(): Promise<Array<{ collection: string }>> {
-    return this.request<Array<{ collection: string }>>('/collections', {
-      method: 'GET',
-    });
+    const response = await this.request<Array<{ collection: string }>>(
+      '/collections',
+      {
+        method: 'GET',
+      },
+    );
+
+    return response.data;
   }
 
   async createCollection(collection: {
@@ -64,16 +92,26 @@ export class DirectusService {
     }>;
     meta?: Record<string, unknown>;
   }): Promise<{ collection: string }> {
-    return this.request<{ collection: string }>('/collections', {
-      method: 'POST',
-      body: collection,
-    });
+    const response = await this.request<{ collection: string }>(
+      '/collections',
+      {
+        method: 'POST',
+        body: collection,
+      },
+    );
+
+    return response.data;
   }
 
   async listRoles(): Promise<Array<{ id: string; name: string }>> {
-    return this.request<Array<{ id: string; name: string }>>('/roles', {
-      method: 'GET',
-    });
+    const response = await this.request<Array<{ id: string; name: string }>>(
+      '/roles',
+      {
+        method: 'GET',
+      },
+    );
+
+    return response.data;
   }
 
   async createPermission(permission: {
@@ -84,10 +122,12 @@ export class DirectusService {
     presets?: Record<string, unknown>;
     validation?: Record<string, unknown>;
   }): Promise<{ id: number }> {
-    return this.request<{ id: number }>('/permissions', {
+    const response = await this.request<{ id: number }>('/permissions', {
       method: 'POST',
       body: permission,
     });
+
+    return response.data;
   }
 
   async listPermissions(query?: QueryParams): Promise<
@@ -98,7 +138,7 @@ export class DirectusService {
       action: string;
     }>
   > {
-    return this.request<
+    const response = await this.request<
       Array<{
         id: number;
         role: string;
@@ -109,19 +149,23 @@ export class DirectusService {
       method: 'GET',
       query,
     });
+
+    return response.data;
   }
 
   async updateCollection(
     collection: string,
     data: Record<string, unknown>,
   ): Promise<{ collection: string }> {
-    return this.request<{ collection: string }>(
+    const response = await this.request<{ collection: string }>(
       `/collections/${collection}`,
       {
-        method: 'PATCH' as any,
+        method: 'PATCH',
         body: data,
       },
     );
+
+    return response.data;
   }
 
   private async request<T>(
@@ -131,27 +175,23 @@ export class DirectusService {
       query?: QueryParams;
       body?: object;
     },
-  ): Promise<T> {
+  ): Promise<DirectusResponse<T>> {
     if (!this.directusUrl) {
       throw new ServiceUnavailableException(
         'DIRECTUS_URL no configurada en el backend',
       );
     }
 
-    const url = new URL(path, this.directusUrl.endsWith('/') ? this.directusUrl : `${this.directusUrl}/`);
+    const url = new URL(
+      path,
+      this.directusUrl.endsWith('/')
+        ? this.directusUrl
+        : `${this.directusUrl}/`,
+    );
 
     if (options.query) {
       for (const [key, value] of Object.entries(options.query)) {
-        if (typeof value === 'undefined') {
-          continue;
-        }
-
-        if (Array.isArray(value)) {
-          url.searchParams.set(key, value.join(','));
-          continue;
-        }
-
-        url.searchParams.set(key, String(value));
+        this.agregarQueryParam(url.searchParams, key, value);
       }
     }
 
@@ -185,7 +225,49 @@ export class DirectusService {
       );
     }
 
-    const json = (await response.json()) as DirectusResponse<T>;
-    return json.data;
+    return (await response.json()) as DirectusResponse<T>;
+  }
+
+  private agregarQueryParam(
+    searchParams: URLSearchParams,
+    key: string,
+    value: QueryValue | undefined,
+  ) {
+    if (typeof value === 'undefined') {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.every((item) => this.esPrimitivo(item))) {
+        searchParams.set(key, value.map(String).join(','));
+        return;
+      }
+
+      value.forEach((item, index) => {
+        this.agregarQueryParam(searchParams, `${key}[${index}]`, item);
+      });
+      return;
+    }
+
+    if (!this.esPrimitivo(value)) {
+      for (const [nestedKey, nestedValue] of Object.entries(value)) {
+        this.agregarQueryParam(
+          searchParams,
+          `${key}[${nestedKey}]`,
+          nestedValue,
+        );
+      }
+      return;
+    }
+
+    searchParams.set(key, String(value));
+  }
+
+  private esPrimitivo(value: unknown): value is Primitive {
+    return (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    );
   }
 }

@@ -1,4 +1,12 @@
-import { IsBooleanString, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBooleanString,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import type { OrdenProductos } from '../products.types';
 
@@ -16,7 +24,13 @@ export class ObtenerProductosQueryDto {
   q?: string;
 
   @IsOptional()
-  @IsIn(['nombre_asc', 'nombre_desc', 'precio_asc', 'precio_desc', 'destacados'])
+  @IsIn([
+    'nombre_asc',
+    'nombre_desc',
+    'precio_asc',
+    'precio_desc',
+    'destacados',
+  ])
   orden?: OrdenProductos;
 
   @IsOptional()

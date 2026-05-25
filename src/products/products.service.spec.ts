@@ -4,111 +4,105 @@ import { ProductsService } from './products.service';
 
 describe('ProductsService', () => {
   let service: ProductsService;
-  let directusService: Pick<DirectusService, 'listItems'>;
+  let directusService: Pick<
+    DirectusService,
+    'listItems' | 'listItemsWithMeta' | 'construirUrlAsset'
+  >;
 
-  const productosMock = [
-    {
-      id: 'p-001',
-      slug: 'matafuego-polvo-abc-5kg',
-      nombre: 'Matafuego Polvo ABC 5kg',
-      marca: 'DragoMen',
-      categoria: 'matafuegos',
-      descripcion: 'Equipo multiproposito para fuego clase A, B y C.',
-      precioArs: 132000,
-      stock: 14,
-      destacado: true,
-    },
-    {
-      id: 'p-002',
-      slug: 'matafuego-co2-3-5kg',
-      nombre: 'Matafuego CO2 3.5kg',
-      marca: 'DragoMen',
-      categoria: 'matafuegos',
-      descripcion: 'Ideal para tableros electricos y equipos sensibles.',
-      precioArs: 218000,
-      stock: 7,
-      destacado: true,
-    },
-    {
-      id: 'p-003',
-      slug: 'servicio-recarga-matafuego',
-      nombre: 'Servicio de Recarga y Prueba Hidraulica',
-      marca: 'DragoMen',
-      categoria: 'servicios',
-      descripcion: 'Mantenimiento certificado para hogares, comercio e industria.',
-      precioArs: 48500,
-      stock: 999,
-      destacado: false,
-    },
-  ];
+  const productoMock = {
+    id: 'p-001',
+    slug: 'matafuego-polvo-abc-5kg',
+    nombre: 'Matafuego Polvo ABC 5kg',
+    marca: 'DragoMen',
+    imagen: 'asset-1',
+    categoria: 'matafuegos',
+    descripcion: 'Equipo multiproposito para fuego clase A, B y C.',
+    precioArs: 132000,
+    stock: 14,
+    destacado: true,
+    specifications: 'ABC',
+  };
 
   beforeEach(() => {
     directusService = {
-      listItems: jest.fn().mockResolvedValue(productosMock),
+      listItems: jest.fn().mockResolvedValue([productoMock]),
+      listItemsWithMeta: jest.fn().mockResolvedValue({
+        data: [productoMock],
+        meta: {
+          filter_count: 3,
+        },
+      }),
+      construirUrlAsset: jest.fn(
+        (fileId: string) => `http://directus.test/assets/${fileId}`,
+      ),
     };
     service = new ProductsService(directusService as DirectusService);
   });
 
-  it('devuelve todos los productos', async () => {
-    const respuesta = await service.obtenerTodos();
-    const productos = respuesta.items;
+  it('devuelve productos paginados con total desde meta de Directus', async () => {
+    const respuesta = await service.obtenerTodos({ limite: 1, pagina: 2 });
 
-    expect(productos.length).toBeGreaterThan(0);
-    expect(productos[0]).toHaveProperty('slug');
-    expect(productos[0]).toHaveProperty('marca');
-    expect(respuesta.total).toBeGreaterThan(0);
+    expect(respuesta.items).toHaveLength(1);
+    expect(respuesta.total).toBe(3);
+    expect(respuesta.totalPaginas).toBe(3);
+    expect(respuesta.items[0]).toMatchObject({
+      slug: 'matafuego-polvo-abc-5kg',
+      imagenUrl: 'http://directus.test/assets/asset-1',
+    });
+  });
+
+  it('envia filtros, orden y paginacion a Directus', async () => {
+    await service.obtenerTodos({
+      categoria: 'matafuegos',
+      destacado: true,
+      q: 'co2',
+      orden: 'precio_desc',
+      limite: 12,
+      pagina: 3,
+    });
+
+    expect(directusService.listItemsWithMeta).toHaveBeenCalledWith(
+      'products',
+      expect.objectContaining({
+        filter: expect.objectContaining({
+          _and: expect.arrayContaining([
+            { categoria: { _eq: 'matafuegos' } },
+            { destacado: { _eq: true } },
+            expect.objectContaining({
+              _or: expect.arrayContaining([{ nombre: { _contains: 'co2' } }]),
+            }),
+          ]),
+        }),
+        sort: ['-precioArs'],
+        limit: 12,
+        page: 3,
+        meta: 'filter_count',
+      }),
+    );
   });
 
   it('devuelve un producto por slug', async () => {
     const producto = await service.obtenerPorSlug('matafuego-polvo-abc-5kg');
 
     expect(producto.nombre).toContain('Matafuego');
+    expect(directusService.listItems).toHaveBeenCalledWith(
+      'products',
+      expect.objectContaining({
+        filter: {
+          slug: {
+            _eq: 'matafuego-polvo-abc-5kg',
+          },
+        },
+        limit: 1,
+      }),
+    );
   });
 
   it('lanza error cuando el slug no existe', async () => {
+    jest.mocked(directusService.listItems).mockResolvedValueOnce([]);
+
     await expect(service.obtenerPorSlug('inexistente')).rejects.toThrow(
       NotFoundException,
     );
-  });
-
-  it('filtra productos por categoria', async () => {
-    const productos = (await service.obtenerTodos({ categoria: 'servicios' })).items;
-
-    expect(productos.length).toBeGreaterThan(0);
-    expect(productos.every((producto) => producto.categoria === 'servicios')).toBe(
-      true,
-    );
-  });
-
-  it('filtra productos por destacado', async () => {
-    const productos = (await service.obtenerTodos({ destacado: true })).items;
-
-    expect(productos.length).toBeGreaterThan(0);
-    expect(productos.every((producto) => producto.destacado)).toBe(true);
-  });
-
-  it('filtra por texto de busqueda', async () => {
-    const productos = (await service.obtenerTodos({ q: 'co2' })).items;
-
-    expect(productos.length).toBeGreaterThan(0);
-    expect(productos.some((producto) => producto.slug.includes('co2'))).toBe(true);
-  });
-
-  it('ordena por precio ascendente', async () => {
-    const productos = (await service.obtenerTodos({ orden: 'precio_asc' })).items;
-
-    expect(productos[0].precioArs).toBeLessThanOrEqual(productos[1].precioArs);
-  });
-
-  it('pagina resultados', async () => {
-    const respuesta = await service.obtenerTodos({
-      limite: 1,
-      pagina: 2,
-      orden: 'nombre_asc',
-    });
-
-    expect(respuesta.items.length).toBe(1);
-    expect(respuesta.pagina).toBe(2);
-    expect(respuesta.totalPaginas).toBeGreaterThan(1);
   });
 });

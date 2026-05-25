@@ -7,10 +7,12 @@ describe('LeadsService', () => {
 
   beforeEach(() => {
     directusService = {
-      createItem: jest.fn().mockImplementation(async (_collection, payload) => ({
-        id: 'lead-1',
-        ...payload,
-      })),
+      createItem: jest
+        .fn()
+        .mockImplementation(async (_collection, payload) => ({
+          id: 'lead-1',
+          ...payload,
+        })),
       listItems: jest.fn().mockResolvedValue([
         {
           id: 'lead-2',

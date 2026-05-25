@@ -5,7 +5,10 @@ import { ContentService } from './content.service';
 describe('ContentController', () => {
   let controller: ContentController;
 
-  const contentServiceMock: Pick<ContentService, 'obtenerBlog' | 'obtenerTestimonios'> = {
+  const contentServiceMock: Pick<
+    ContentService,
+    'obtenerBlog' | 'obtenerTestimonios'
+  > = {
     obtenerBlog: jest.fn().mockResolvedValue([
       {
         id: 'b-1',

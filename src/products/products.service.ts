@@ -21,6 +21,16 @@ type ProductoDirectus = {
   specifications?: string;
 };
 
+type FiltroDirectus = {
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | FiltroDirectus
+    | FiltroDirectus[]
+    | undefined;
+};
+
 @Injectable()
 export class ProductsService {
   private readonly productsCollection =
@@ -34,25 +44,25 @@ export class ProductsService {
     const limite = filtros.limite ?? 6;
     const pagina = filtros.pagina ?? 1;
 
-    // IMPORTANTE:
-    // usamos any porque Directus tiene tipos incompatibles
-    const queryFilters: any = {
-      _and: [
-        {
-          slug: {
-            _not_null: true,
-          },
+    const condiciones: FiltroDirectus[] = [
+      {
+        slug: {
+          _not_null: true,
         },
-        {
-          nombre: {
-            _not_null: true,
-          },
+      },
+      {
+        nombre: {
+          _not_null: true,
         },
-      ],
+      },
+    ];
+
+    const queryFilters: FiltroDirectus = {
+      _and: condiciones,
     };
 
     if (filtros.categoria) {
-      queryFilters._and.push({
+      condiciones.push({
         categoria: {
           _eq: filtros.categoria,
         },
@@ -60,7 +70,7 @@ export class ProductsService {
     }
 
     if (typeof filtros.destacado === 'boolean') {
-      queryFilters._and.push({
+      condiciones.push({
         destacado: {
           _eq: filtros.destacado,
         },
@@ -70,7 +80,7 @@ export class ProductsService {
     if (filtros.q?.trim()) {
       const termino = filtros.q.trim();
 
-      queryFilters._and.push({
+      condiciones.push({
         _or: [
           {
             nombre: {
@@ -96,10 +106,8 @@ export class ProductsService {
       });
     }
 
-    const ordenDirectus = this.mapearOrdenamiento(filtros.orden);
-
-    const respuesta: any =
-      await this.directusService.listItems<ProductoDirectus>(
+    const respuesta =
+      await this.directusService.listItemsWithMeta<ProductoDirectus>(
         this.productsCollection,
         {
           fields: [
@@ -116,27 +124,17 @@ export class ProductsService {
             'specifications',
           ],
           filter: queryFilters,
-          sort: ordenDirectus,
+          sort: this.mapearOrdenamiento(filtros.orden),
           limit: limite,
           page: pagina,
           meta: 'filter_count',
         },
       );
 
-    const itemsDirectus: ProductoDirectus[] =
-      respuesta?.data || (Array.isArray(respuesta) ? respuesta : []);
-
-    const total =
-      respuesta?.meta?.filter_count ?? itemsDirectus.length;
-
-    const totalPaginas = Math.max(
-      1,
-      Math.ceil(total / limite),
-    );
-
-    const items = itemsDirectus.map((item) =>
-      this.transformarProducto(item),
-    );
+    const itemsDirectus = respuesta.data;
+    const total = respuesta.meta?.filter_count ?? itemsDirectus.length;
+    const totalPaginas = Math.max(1, Math.ceil(total / limite));
+    const items = itemsDirectus.map((item) => this.transformarProducto(item));
 
     return {
       items,
@@ -148,7 +146,7 @@ export class ProductsService {
   }
 
   async obtenerPorSlug(slug: string): Promise<Producto> {
-    const respuesta: any =
+    const itemsDirectus =
       await this.directusService.listItems<ProductoDirectus>(
         this.productsCollection,
         {
@@ -165,37 +163,25 @@ export class ProductsService {
             'destacado',
             'specifications',
           ],
-
-          // IMPORTANTE:
-          // también any implícito acá
           filter: {
             slug: {
               _eq: slug,
             },
-          } as any,
-
+          },
           limit: 1,
         },
       );
 
-    const itemsDirectus =
-      respuesta?.data ||
-      (Array.isArray(respuesta) ? respuesta : []);
-
     const productoDirectus = itemsDirectus[0];
 
     if (!productoDirectus) {
-      throw new NotFoundException(
-        `Producto con slug '${slug}' no encontrado`,
-      );
+      throw new NotFoundException(`Producto con slug '${slug}' no encontrado`);
     }
 
     return this.transformarProducto(productoDirectus);
   }
 
-  private mapearOrdenamiento(
-    orden: OrdenProductos = 'destacados',
-  ): string[] {
+  private mapearOrdenamiento(orden: OrdenProductos = 'destacados'): string[] {
     switch (orden) {
       case 'nombre_asc':
         return ['nombre'];
@@ -215,9 +201,7 @@ export class ProductsService {
     }
   }
 
-  private transformarProducto(
-    item: ProductoDirectus,
-  ): Producto {
+  private transformarProducto(item: ProductoDirectus): Producto {
     const imagenId = this.obtenerImagenId(item.imagen);
 
     return {
@@ -225,25 +209,16 @@ export class ProductsService {
       slug: item.slug || '',
       nombre: item.nombre || '',
       marca: item.marca?.trim() || 'Sin marca',
-
       imagenId: imagenId || undefined,
-
       imagenUrl: imagenId
         ? this.directusService.construirUrlAsset(imagenId)
         : undefined,
-
       categoria: item.categoria?.trim() || 'general',
-
       descripcion: item.descripcion?.trim() || '',
-
       precioArs: Number(item.precioArs || 0),
-
       stock: Number(item.stock || 0),
-
       destacado: Boolean(item.destacado),
-
-      especificaciones:
-        item.specifications?.trim() || '',
+      especificaciones: item.specifications?.trim() || '',
     };
   }
 
@@ -256,10 +231,7 @@ export class ProductsService {
       return imagen;
     }
 
-    if (
-      imagen.id !== undefined &&
-      imagen.id !== null
-    ) {
+    if (imagen.id !== undefined && imagen.id !== null) {
       return String(imagen.id);
     }
 

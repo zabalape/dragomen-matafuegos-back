@@ -20,7 +20,8 @@ type LeadDirectus = {
 
 @Injectable()
 export class LeadsService {
-  private readonly leadsCollection = process.env.DIRECTUS_COLLECTION_LEADS || 'leads';
+  private readonly leadsCollection =
+    process.env.DIRECTUS_COLLECTION_LEADS || 'leads';
 
   constructor(private readonly directusService: DirectusService) {}
 
@@ -51,7 +52,14 @@ export class LeadsService {
     const leads = await this.directusService.listItems<LeadDirectus>(
       this.leadsCollection,
       {
-        fields: ['id', 'nombre', 'telefono', 'consulta', 'origen', 'marcaTemporal'],
+        fields: [
+          'id',
+          'nombre',
+          'telefono',
+          'consulta',
+          'origen',
+          'marcaTemporal',
+        ],
         sort: ['-marcaTemporal'],
         limit: limite,
       },

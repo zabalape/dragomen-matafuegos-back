@@ -1,128 +1,91 @@
-import { Injectable } from '@nestjs/common';
 import { DirectusService } from '../directus/directus.service';
-import { PublicacionBlog, Testimonio } from './content.types';
+import { ContentService } from './content.service';
 
-type PublicacionBlogDirectus = {
-  id: string | number;
-  slug?: string;
-  titulo?: string;
-  resumen?: string;
-  fechaPublicacion?: string;
-  categoria?: string;
-  imagen?: string;
-};
+describe('ContentService', () => {
+  let service: ContentService;
+  let directusService: Pick<DirectusService, 'listItems'>;
 
-type TestimonioDirectus = {
-  id: string | number;
-  nombre?: string;
-  empresa?: string;
-  mensaje?: string;
-  puntuacion?: number;
-};
+  const blog = [
+    {
+      id: 'b-1',
+      slug: 'primer-post',
+      titulo: 'Primer post',
+      resumen: ' Resumen ',
+      fechaPublicacion: '2026-03-01T00:00:00.000Z',
+      categoria: 'Matafuegos',
+      imagen: 'asset-blog',
+    },
+  ];
 
-@Injectable()
-export class ContentService {
-  private readonly blogCollection = process.env.DIRECTUS_COLLECTION_BLOG || 'blog';
-  private readonly testimonialsCollection =
-    process.env.DIRECTUS_COLLECTION_TESTIMONIALS || 'testimonials';
+  const testimonios = [
+    {
+      id: 't-1',
+      nombre: 'Cliente',
+      empresa: ' Empresa ',
+      mensaje: 'Muy buen servicio',
+      puntuacion: 5,
+    },
+  ];
 
-  constructor(private readonly directusService: DirectusService) {}
-
-  async obtenerBlog(): Promise<PublicacionBlog[]> {
-    const items = await this.directusService.listItems<PublicacionBlogDirectus>(
-      this.blogCollection,
-      {
-        fields: ['id', 'slug', 'titulo', 'resumen', 'fechaPublicacion', 'categoria', 'imagen'],
-      },
-    );
-
-    return items
-      .filter((item) => item.slug && item.titulo)
-      .map((item) => ({
-        id: String(item.id),
-        slug: item.slug || '',
-        titulo: item.titulo || '',
-        resumen: item.resumen?.trim() || '',
-        fechaPublicacion: item.fechaPublicacion || new Date().toISOString(),
-        categoria: item.categoria || undefined,
-        imagen: item.imagen || undefined,
-      }));
-  }
-
-  async obtenerBlogPorSlug(slug: string): Promise<PublicacionBlog | null> {
-    const items = await this.directusService.listItems<PublicacionBlogDirectus>(
-      this.blogCollection,
-      {
-        fields: ['id', 'slug', 'titulo', 'resumen', 'fechaPublicacion', 'categoria', 'imagen'],
-        filter: {
-          slug: {
-            _eq: slug,
-          },
-        },
-        limit: 1,
-      },
-    );
-
-    if (!items || items.length === 0) {
-      return null;
-    }
-
-    const item = items[0];
-
-    return {
-      id: String(item.id),
-      slug: item.slug || '',
-      titulo: item.titulo || '',
-      resumen: item.resumen?.trim() || '',
-      fechaPublicacion: item.fechaPublicacion || new Date().toISOString(),
-      categoria: item.categoria || undefined,
-      imagen: item.imagen || undefined,
-    };
-  }
-
-  async obtenerTestimonios(): Promise<Testimonio[]> {
-    const items = await this.directusService.listItems<TestimonioDirectus>(
-      this.testimonialsCollection,
-      {
-        fields: ['id', 'nombre', 'empresa', 'mensaje', 'puntuacion'],
-      },
-    );
-
-    return items
-      .filter((item) => item.nombre && item.mensaje)
-      .map((item) => ({
-        id: String(item.id),
-        nombre: item.nombre || '',
-        empresa: item.empresa?.trim() || '',
-        mensaje: item.mensaje || '',
-        puntuacion: Number(item.puntuacion || 0),
-      }));
-  }
-
-  // 👈 NUEVO MÉTODO: Consultar un testimonio individual por su ID en Directus
-  async obtenerTestimonioPorId(id: string): Promise<Testimonio | null> {
-    try {
-      // Usamos readItem directamente pasándole la colección y el ID
-      const item = await this.directusService.readItem<TestimonioDirectus>(
-        this.testimonialsCollection,
-        id,
-        {
-          fields: ['id', 'nombre', 'empresa', 'mensaje', 'puntuacion'],
+  beforeEach(() => {
+    directusService = {
+      listItems: jest.fn().mockImplementation(async (collection, params) => {
+        if (collection === 'blog') {
+          const slug = params?.filter?.slug?._eq;
+          return slug ? blog.filter((item) => item.slug === slug) : blog;
         }
-      );
 
-      if (!item) return null;
+        if (collection === 'testimonials') {
+          const id = params?.filter?.id?._eq;
+          return id
+            ? testimonios.filter((item) => item.id === id)
+            : testimonios;
+        }
 
-      return {
-        id: String(item.id),
-        nombre: item.nombre || '',
-        empresa: item.empresa?.trim() || '',
-        mensaje: item.mensaje || '',
-        puntuacion: Number(item.puntuacion || 0),
-      };
-    } catch (error) {
-      // Si Directus tira un 404 porque el ID no existe, lo manejamos devolviendo null
-      return null;
-    }
-  }
-}
+        return [];
+      }),
+    };
+
+    service = new ContentService(directusService as DirectusService);
+  });
+
+  it('devuelve publicaciones de blog validas', async () => {
+    const publicaciones = await service.obtenerBlog();
+
+    expect(publicaciones).toEqual([
+      expect.objectContaining({
+        id: 'b-1',
+        slug: 'primer-post',
+        resumen: 'Resumen',
+      }),
+    ]);
+  });
+
+  it('devuelve una publicacion por slug', async () => {
+    const publicacion = await service.obtenerBlogPorSlug('primer-post');
+
+    expect(publicacion?.titulo).toBe('Primer post');
+  });
+
+  it('devuelve null si no encuentra la publicacion', async () => {
+    const publicacion = await service.obtenerBlogPorSlug('inexistente');
+
+    expect(publicacion).toBeNull();
+  });
+
+  it('devuelve testimonios', async () => {
+    const resultado = await service.obtenerTestimonios();
+
+    expect(resultado[0]).toMatchObject({
+      id: 't-1',
+      empresa: 'Empresa',
+      puntuacion: 5,
+    });
+  });
+
+  it('devuelve un testimonio por id', async () => {
+    const resultado = await service.obtenerTestimonioPorId('t-1');
+
+    expect(resultado?.nombre).toBe('Cliente');
+  });
+});
