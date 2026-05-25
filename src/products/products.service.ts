@@ -18,7 +18,6 @@ type ProductoDirectus = {
   precioArs?: number;
   stock?: number;
   destacado?: boolean;
-  specifications?: string;
 };
 
 type FiltroDirectus = {
@@ -121,7 +120,6 @@ export class ProductsService {
             'precioArs',
             'stock',
             'destacado',
-            'specifications',
           ],
           filter: queryFilters,
           sort: this.mapearOrdenamiento(filtros.orden),
@@ -161,7 +159,6 @@ export class ProductsService {
             'precioArs',
             'stock',
             'destacado',
-            'specifications',
           ],
           filter: {
             slug: {
@@ -218,7 +215,7 @@ export class ProductsService {
       precioArs: Number(item.precioArs || 0),
       stock: Number(item.stock || 0),
       destacado: Boolean(item.destacado),
-      especificaciones: item.specifications?.trim() || '',
+      especificaciones: '',
     };
   }
 
