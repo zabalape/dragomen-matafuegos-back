@@ -18,6 +18,7 @@ type ProductoDirectus = {
   precioArs?: number;
   stock?: number;
   destacado?: boolean;
+  specifications?: string;
 };
 
 @Injectable()
@@ -30,45 +31,116 @@ export class ProductsService {
   async obtenerTodos(
     filtros: FiltrosProductos = {},
   ): Promise<RespuestaPaginadaProductos> {
-    const productos = await this.obtenerProductosDesdeDirectus();
-
-    const productosFiltrados = productos.filter((producto) => {
-      const coincideCategoria = filtros.categoria
-        ? producto.categoria === filtros.categoria
-        : true;
-
-      const coincideDestacado =
-        typeof filtros.destacado === 'boolean'
-          ? producto.destacado === filtros.destacado
-          : true;
-
-      const termino = filtros.q?.trim().toLowerCase();
-      const coincideBusqueda = termino
-        ? `${producto.nombre} ${producto.descripcion} ${producto.categoria}`
-            .toLowerCase()
-            .includes(termino)
-        : true;
-
-      return coincideCategoria && coincideDestacado && coincideBusqueda;
-    });
-
-    const productosOrdenados = this.ordenarProductos(
-      productosFiltrados,
-      filtros.orden,
-    );
-
     const limite = filtros.limite ?? 6;
     const pagina = filtros.pagina ?? 1;
-    const total = productosOrdenados.length;
-    const totalPaginas = Math.max(1, Math.ceil(total / limite));
-    const paginaAjustada = Math.min(Math.max(1, pagina), totalPaginas);
-    const indiceInicio = (paginaAjustada - 1) * limite;
-    const indiceFin = indiceInicio + limite;
-    const items = productosOrdenados.slice(indiceInicio, indiceFin);
+
+    // IMPORTANTE:
+    // usamos any porque Directus tiene tipos incompatibles
+    const queryFilters: any = {
+      _and: [
+        {
+          slug: {
+            _not_null: true,
+          },
+        },
+        {
+          nombre: {
+            _not_null: true,
+          },
+        },
+      ],
+    };
+
+    if (filtros.categoria) {
+      queryFilters._and.push({
+        categoria: {
+          _eq: filtros.categoria,
+        },
+      });
+    }
+
+    if (typeof filtros.destacado === 'boolean') {
+      queryFilters._and.push({
+        destacado: {
+          _eq: filtros.destacado,
+        },
+      });
+    }
+
+    if (filtros.q?.trim()) {
+      const termino = filtros.q.trim();
+
+      queryFilters._and.push({
+        _or: [
+          {
+            nombre: {
+              _contains: termino,
+            },
+          },
+          {
+            descripcion: {
+              _contains: termino,
+            },
+          },
+          {
+            categoria: {
+              _contains: termino,
+            },
+          },
+          {
+            marca: {
+              _contains: termino,
+            },
+          },
+        ],
+      });
+    }
+
+    const ordenDirectus = this.mapearOrdenamiento(filtros.orden);
+
+    const respuesta: any =
+      await this.directusService.listItems<ProductoDirectus>(
+        this.productsCollection,
+        {
+          fields: [
+            'id',
+            'slug',
+            'nombre',
+            'marca',
+            'imagen',
+            'categoria',
+            'descripcion',
+            'precioArs',
+            'stock',
+            'destacado',
+            'specifications',
+          ],
+          filter: queryFilters,
+          sort: ordenDirectus,
+          limit: limite,
+          page: pagina,
+          meta: 'filter_count',
+        },
+      );
+
+    const itemsDirectus: ProductoDirectus[] =
+      respuesta?.data || (Array.isArray(respuesta) ? respuesta : []);
+
+    const total =
+      respuesta?.meta?.filter_count ?? itemsDirectus.length;
+
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(total / limite),
+    );
+
+    const items = itemsDirectus.map((item) =>
+      this.transformarProducto(item),
+    );
 
     return {
       items,
-      pagina: paginaAjustada,
+      pagina,
       limite,
       total,
       totalPaginas,
@@ -76,91 +148,118 @@ export class ProductsService {
   }
 
   async obtenerPorSlug(slug: string): Promise<Producto> {
-    const productos = await this.obtenerProductosDesdeDirectus();
-    const producto = productos.find((item) => item.slug === slug);
+    const respuesta: any =
+      await this.directusService.listItems<ProductoDirectus>(
+        this.productsCollection,
+        {
+          fields: [
+            'id',
+            'slug',
+            'nombre',
+            'marca',
+            'imagen',
+            'categoria',
+            'descripcion',
+            'precioArs',
+            'stock',
+            'destacado',
+            'specifications',
+          ],
 
-    if (!producto) {
-      throw new NotFoundException(`Producto con slug '${slug}' no encontrado`);
+          // IMPORTANTE:
+          // también any implícito acá
+          filter: {
+            slug: {
+              _eq: slug,
+            },
+          } as any,
+
+          limit: 1,
+        },
+      );
+
+    const itemsDirectus =
+      respuesta?.data ||
+      (Array.isArray(respuesta) ? respuesta : []);
+
+    const productoDirectus = itemsDirectus[0];
+
+    if (!productoDirectus) {
+      throw new NotFoundException(
+        `Producto con slug '${slug}' no encontrado`,
+      );
     }
 
-    return producto;
+    return this.transformarProducto(productoDirectus);
   }
 
-  private ordenarProductos(
-    productos: Producto[],
+  private mapearOrdenamiento(
     orden: OrdenProductos = 'destacados',
-  ): Producto[] {
-    const copia = [...productos];
-
+  ): string[] {
     switch (orden) {
       case 'nombre_asc':
-        return copia.sort((a, b) => a.nombre.localeCompare(b.nombre));
+        return ['nombre'];
+
       case 'nombre_desc':
-        return copia.sort((a, b) => b.nombre.localeCompare(a.nombre));
+        return ['-nombre'];
+
       case 'precio_asc':
-        return copia.sort((a, b) => a.precioArs - b.precioArs);
+        return ['precioArs'];
+
       case 'precio_desc':
-        return copia.sort((a, b) => b.precioArs - a.precioArs);
+        return ['-precioArs'];
+
       case 'destacados':
       default:
-        return copia.sort((a, b) => Number(b.destacado) - Number(a.destacado));
+        return ['-destacado', 'nombre'];
     }
   }
 
-  private async obtenerProductosDesdeDirectus(): Promise<Producto[]> {
-    const items = await this.directusService.listItems<ProductoDirectus>(
-      this.productsCollection,
-      {
-        fields: [
-          'id',
-          'slug',
-          'nombre',
-          'marca',
-          'imagen',
-          'categoria',
-          'descripcion',
-          'precioArs',
-          'stock',
-          'destacado',
-        ],
-      },
-    );
+  private transformarProducto(
+    item: ProductoDirectus,
+  ): Producto {
+    const imagenId = this.obtenerImagenId(item.imagen);
 
-    return items
-      .filter((item) => item.slug && item.nombre)
-      .map((item) => {
-        const imagenId = this.obtenerImagenId(item.imagen);
+    return {
+      id: String(item.id),
+      slug: item.slug || '',
+      nombre: item.nombre || '',
+      marca: item.marca?.trim() || 'Sin marca',
 
-        return {
-          id: String(item.id),
-          slug: item.slug || '',
-          nombre: item.nombre || '',
-          marca: item.marca?.trim() || 'Sin marca',
-          imagenId: imagenId || undefined,
-          imagenUrl: imagenId
-            ? this.directusService.construirUrlAsset(imagenId)
-            : undefined,
-          categoria: item.categoria?.trim() || 'general',
-          descripcion: item.descripcion?.trim() || '',
-          precioArs: Number(item.precioArs || 0),
-          stock: Number(item.stock || 0),
-          destacado: Boolean(item.destacado),
-        };
-      });
+      imagenId: imagenId || undefined,
+
+      imagenUrl: imagenId
+        ? this.directusService.construirUrlAsset(imagenId)
+        : undefined,
+
+      categoria: item.categoria?.trim() || 'general',
+
+      descripcion: item.descripcion?.trim() || '',
+
+      precioArs: Number(item.precioArs || 0),
+
+      stock: Number(item.stock || 0),
+
+      destacado: Boolean(item.destacado),
+
+      especificaciones:
+        item.specifications?.trim() || '',
+    };
   }
 
   private obtenerImagenId(
     imagen?: string | { id?: string | number } | null,
   ): string | null {
-    if (!imagen) {
-      return null;
-    }
+    if (!imagen) return null;
 
     if (typeof imagen === 'string') {
       return imagen;
     }
 
-    if (typeof imagen.id !== 'undefined' && imagen.id !== null) {
+    if (
+      imagen.id !== undefined &&
+      imagen.id !== null
+    ) {
       return String(imagen.id);
     }
 

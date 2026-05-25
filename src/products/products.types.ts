@@ -10,6 +10,7 @@ export type Producto = {
   precioArs: number;
   stock: number;
   destacado: boolean;
+  especificaciones?: string; // ← Añadido el campo de especificaciones
 };
 
 export type FiltrosProductos = {
