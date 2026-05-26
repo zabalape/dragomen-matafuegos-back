@@ -7,12 +7,15 @@ import {
   RespuestaPaginadaProductos,
 } from './products.types';
 
+// Tipamos correctamente el objeto de la imagen tal como viene de Directus
+type ImagenDirectus = string | { id?: string | number } | null;
+
 type ProductoDirectus = {
   id: string | number;
   slug?: string;
   nombre?: string;
   marca?: string;
-  imagen?: string;
+  imagen?: ImagenDirectus; // Corregido: Directus suele llamarlo 'imagen' (relación con directus_files)
   categoria?: string;
   descripcion?: string;
   precioArs?: number;
@@ -115,7 +118,7 @@ export class ProductsService {
             'slug',
             'nombre',
             'marca',
-            'imagen',
+            'imagen', // Pedimos el campo 'imagen' a la API de Directus
             'categoria',
             'descripcion',
             'precioArs',
@@ -154,7 +157,7 @@ export class ProductsService {
             'slug',
             'nombre',
             'marca',
-            'imagen',
+            'imagen', // Pedimos el campo 'imagen'
             'categoria',
             'descripcion',
             'precioArs',
@@ -183,16 +186,12 @@ export class ProductsService {
     switch (orden) {
       case 'nombre_asc':
         return ['nombre'];
-
       case 'nombre_desc':
         return ['-nombre'];
-
       case 'precio_asc':
         return ['precioArs'];
-
       case 'precio_desc':
         return ['-precioArs'];
-
       case 'destacados':
       default:
         return ['-destacado', 'nombre'];
@@ -208,9 +207,12 @@ export class ProductsService {
       nombre: item.nombre || '',
       marca: item.marca?.trim() || 'Sin marca',
       imagenId: imagenId || undefined,
+      
+      // CAMBIO CLAVE: Entregamos una URL relativa que apunta al endpoint proxy de NestJS
       imagenUrl: imagenId
-        ? this.directusService.construirUrlAsset(imagenId)
+        ? `/assets/${imagenId}`
         : undefined,
+        
       categoria: item.categoria?.trim() || 'general',
       descripcion: item.descripcion?.trim() || '',
       precioArs: Number(item.precioArs || 0),
@@ -220,9 +222,7 @@ export class ProductsService {
     };
   }
 
-  private obtenerImagenId(
-    imagen?: string | { id?: string | number } | null,
-  ): string | null {
+  private obtenerImagenId(imagen?: ImagenDirectus): string | null {
     if (!imagen) return null;
 
     if (typeof imagen === 'string') {
