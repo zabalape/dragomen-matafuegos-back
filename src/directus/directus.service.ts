@@ -37,6 +37,38 @@ export class DirectusService {
     return `${base}/assets/${fileId}`;
   }
 
+  /**
+   * NUEVO MÉTODO: Obtiene el stream binario de un asset desde Directus
+   */
+  async obtenerStreamAsset(fileId: string): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string }> {
+    if (!this.directusUrl) {
+      throw new ServiceUnavailableException(
+        'DIRECTUS_URL no configurada en el backend',
+      );
+    }
+
+    const base = this.directusUrl.endsWith('/') ? this.directusUrl : `${this.directusUrl}/`;
+    const url = new URL(`assets/${fileId}`, base);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(this.directusToken ? { Authorization: `Bearer ${this.directusToken}` } : {}),
+      },
+    });
+
+    if (!response.ok || !response.body) {
+      throw new ServiceUnavailableException(
+        `No se pudo obtener el asset de Directus (${response.status})`,
+      );
+    }
+
+    return {
+      stream: response.body,
+      contentType: response.headers.get('content-type') || 'image/jpeg',
+    };
+  }
+
   async listItems<T>(
     collection: string,
     params: QueryParams = {},

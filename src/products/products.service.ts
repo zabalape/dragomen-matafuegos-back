@@ -7,7 +7,6 @@ import {
   RespuestaPaginadaProductos,
 } from './products.types';
 
-// Tipamos correctamente el objeto de la imagen tal como viene de Directus
 type ImagenDirectus = string | { id?: string | number } | null;
 
 type ProductoDirectus = {
@@ -15,7 +14,7 @@ type ProductoDirectus = {
   slug?: string;
   nombre?: string;
   marca?: string;
-  imagen?: ImagenDirectus; // Corregido: Directus suele llamarlo 'imagen' (relación con directus_files)
+  imagen?: ImagenDirectus;
   categoria?: string;
   descripcion?: string;
   precioArs?: number;
@@ -48,63 +47,28 @@ export class ProductsService {
     const pagina = filtros.pagina ?? 1;
 
     const condiciones: FiltroDirectus[] = [
-      {
-        slug: {
-          _nnull: true,
-        },
-      },
-      {
-        nombre: {
-          _nnull: true,
-        },
-      },
+      { slug: { _nnull: true } },
+      { nombre: { _nnull: true } },
     ];
 
-    const queryFilters: FiltroDirectus = {
-      _and: condiciones,
-    };
+    const queryFilters: FiltroDirectus = { _and: condiciones };
 
     if (filtros.categoria) {
-      condiciones.push({
-        categoria: {
-          _eq: filtros.categoria,
-        },
-      });
+      condiciones.push({ categoria: { _eq: filtros.categoria } });
     }
 
     if (typeof filtros.destacado === 'boolean') {
-      condiciones.push({
-        destacado: {
-          _eq: filtros.destacado,
-        },
-      });
+      condiciones.push({ destacado: { _eq: filtros.destacado } });
     }
 
     if (filtros.q?.trim()) {
       const termino = filtros.q.trim();
-
       condiciones.push({
         _or: [
-          {
-            nombre: {
-              _contains: termino,
-            },
-          },
-          {
-            descripcion: {
-              _contains: termino,
-            },
-          },
-          {
-            categoria: {
-              _contains: termino,
-            },
-          },
-          {
-            marca: {
-              _contains: termino,
-            },
-          },
+          { nombre: { _contains: termino } },
+          { descripcion: { _contains: termino } },
+          { categoria: { _contains: termino } },
+          { marca: { _contains: termino } },
         ],
       });
     }
@@ -118,7 +82,7 @@ export class ProductsService {
             'slug',
             'nombre',
             'marca',
-            'imagen', // Pedimos el campo 'imagen' a la API de Directus
+            'imagen',
             'categoria',
             'descripcion',
             'precioArs',
@@ -138,13 +102,7 @@ export class ProductsService {
     const totalPaginas = Math.max(1, Math.ceil(total / limite));
     const items = itemsDirectus.map((item) => this.transformarProducto(item));
 
-    return {
-      items,
-      pagina,
-      limite,
-      total,
-      totalPaginas,
-    };
+    return { items, pagina, limite, total, totalPaginas };
   }
 
   async obtenerPorSlug(slug: string): Promise<Producto> {
@@ -157,24 +115,19 @@ export class ProductsService {
             'slug',
             'nombre',
             'marca',
-            'imagen', // Pedimos el campo 'imagen'
+            'imagen',
             'categoria',
             'descripcion',
             'precioArs',
             'stock',
             'destacado',
           ],
-          filter: {
-            slug: {
-              _eq: slug,
-            },
-          },
+          filter: { slug: { _eq: slug } },
           limit: 1,
         },
       );
 
     const productoDirectus = itemsDirectus[0];
-
     if (!productoDirectus) {
       throw new NotFoundException(`Producto con slug '${slug}' no encontrado`);
     }
@@ -184,17 +137,12 @@ export class ProductsService {
 
   private mapearOrdenamiento(orden: OrdenProductos = 'destacados'): string[] {
     switch (orden) {
-      case 'nombre_asc':
-        return ['nombre'];
-      case 'nombre_desc':
-        return ['-nombre'];
-      case 'precio_asc':
-        return ['precioArs'];
-      case 'precio_desc':
-        return ['-precioArs'];
+      case 'nombre_asc': return ['nombre'];
+      case 'nombre_desc': return ['-nombre'];
+      case 'precio_asc': return ['precioArs'];
+      case 'precio_desc': return ['-precioArs'];
       case 'destacados':
-      default:
-        return ['-destacado', 'nombre'];
+      default: return ['-destacado', 'nombre'];
     }
   }
 
@@ -208,10 +156,8 @@ export class ProductsService {
       marca: item.marca?.trim() || 'Sin marca',
       imagenId: imagenId || undefined,
       
-      // CAMBIO CLAVE: Entregamos una URL relativa que apunta al endpoint proxy de NestJS
-      imagenUrl: imagenId
-        ? `/assets/${imagenId}`
-        : undefined,
+      // Mantenemos la ruta limpia hacia el proxy de NestJS
+      imagenUrl: imagenId ? `/assets/${imagenId}` : undefined,
         
       categoria: item.categoria?.trim() || 'general',
       descripcion: item.descripcion?.trim() || '',
@@ -224,15 +170,8 @@ export class ProductsService {
 
   private obtenerImagenId(imagen?: ImagenDirectus): string | null {
     if (!imagen) return null;
-
-    if (typeof imagen === 'string') {
-      return imagen;
-    }
-
-    if (imagen.id !== undefined && imagen.id !== null) {
-      return String(imagen.id);
-    }
-
+    if (typeof imagen === 'string') return imagen;
+    if (imagen.id !== undefined && imagen.id !== null) return String(imagen.id);
     return null;
   }
 }
