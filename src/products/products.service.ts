@@ -20,6 +20,7 @@ type ProductoDirectus = {
   precioArs?: number;
   stock?: number;
   destacado?: boolean;
+  disponible?: boolean;
   especificaciones?: string;
 };
 
@@ -61,6 +62,23 @@ export class ProductsService {
       condiciones.push({ destacado: { _eq: filtros.destacado } });
     }
 
+    if (filtros.marca) {
+      condiciones.push({ marca: { _eq: filtros.marca } });
+    }
+
+    if (filtros.especificaciones) {
+      condiciones.push({ especificaciones: { _eq: filtros.especificaciones } });
+    }
+
+    if (filtros.soloDisponibles) {
+      condiciones.push({
+        _or: [
+          { stock: { _gt: 0 } },
+          { disponible: { _eq: true } },
+        ],
+      });
+    }
+
     if (filtros.q?.trim()) {
       const termino = filtros.q.trim();
       condiciones.push({
@@ -88,6 +106,7 @@ export class ProductsService {
             'precioArs',
             'stock',
             'destacado',
+            'especificaciones',
           ],
           filter: queryFilters,
           sort: this.mapearOrdenamiento(filtros.orden),
@@ -121,6 +140,7 @@ export class ProductsService {
             'precioArs',
             'stock',
             'destacado',
+            'especificaciones',
           ],
           filter: { slug: { _eq: slug } },
           limit: 1,
@@ -164,7 +184,7 @@ export class ProductsService {
       precioArs: Number(item.precioArs || 0),
       stock: Number(item.stock || 0),
       destacado: Boolean(item.destacado),
-      especificaciones: '',
+      especificaciones: item.especificaciones?.trim() || '',
     };
   }
 

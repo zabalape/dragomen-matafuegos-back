@@ -11,6 +11,9 @@ export class ProductsController {
     return this.productsService.obtenerTodos({
       categoria: query.categoria?.trim() || undefined,
       destacado: this.normalizarDestacado(query.destacado),
+      marca: query.marca?.trim() || undefined,
+      especificaciones: query.especificaciones?.trim() || undefined,
+      soloDisponibles: query.soloDisponibles,
       q: query.q?.trim() || undefined,
       orden: query.orden,
       pagina: query.pagina,

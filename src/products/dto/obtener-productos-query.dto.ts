@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsBooleanString,
   IsIn,
   IsInt,
@@ -18,6 +19,19 @@ export class ObtenerProductosQueryDto {
   @IsOptional()
   @IsBooleanString()
   destacado?: string;
+
+  @IsOptional()
+  @IsString()
+  marca?: string;
+
+  @IsOptional()
+  @IsString()
+  especificaciones?: string;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  soloDisponibles?: boolean;
 
   @IsOptional()
   @IsString()

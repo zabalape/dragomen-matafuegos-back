@@ -16,6 +16,9 @@ export type Producto = {
 export type FiltrosProductos = {
   categoria?: string;
   destacado?: boolean;
+  marca?: string;
+  especificaciones?: string;
+  soloDisponibles?: boolean;
   q?: string;
   orden?: OrdenProductos;
   pagina?: number;
