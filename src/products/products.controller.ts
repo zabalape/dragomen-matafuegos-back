@@ -14,6 +14,7 @@ export class ProductsController {
       marca: query.marca?.trim() || undefined,
       especificaciones: query.especificaciones?.trim() || undefined,
       soloDisponibles: query.soloDisponibles,
+      todos: query.todos,
       q: query.q?.trim() || undefined,
       orden: query.orden,
       pagina: query.pagina,

@@ -34,6 +34,11 @@ export class ObtenerProductosQueryDto {
   soloDisponibles?: boolean;
 
   @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  todos?: boolean;
+
+  @IsOptional()
   @IsString()
   q?: string;
 

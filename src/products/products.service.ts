@@ -91,37 +91,54 @@ export class ProductsService {
       });
     }
 
-    const respuesta =
-      await this.directusService.listItemsWithMeta<ProductoDirectus>(
-        this.productsCollection,
-        {
-          fields: [
-            'id',
-            'slug',
-            'nombre',
-            'marca',
-            'imagen',
-            'categoria',
-            'descripcion',
-            'precioArs',
-            'stock',
-            'destacado',
-            'especificaciones',
-          ],
-          filter: queryFilters,
-          sort: this.mapearOrdenamiento(filtros.orden),
-          limit: limite,
-          page: pagina,
-          meta: 'filter_count',
-        },
-      );
+    const params: any = {
+      fields: [
+        'id',
+        'slug',
+        'nombre',
+        'marca',
+        'imagen',
+        'categoria',
+        'descripcion',
+        'precioArs',
+        'stock',
+        'destacado',
+        'especificaciones',
+      ],
+      filter: queryFilters,
+      sort: this.mapearOrdenamiento(filtros.orden),
+      meta: 'filter_count',
+    };
+
+    // Si el frontend solicita "todos", pedimos a Directus sin paginar (limit: -1)
+    if (filtros.todos) {
+      // Directus acepta limit=-1 para devolver todos los items
+      params.limit = -1;
+    } else {
+      params.limit = limite;
+      params.page = pagina;
+    }
+
+    const respuesta = await this.directusService.listItemsWithMeta<ProductoDirectus>(
+      this.productsCollection,
+      params as any,
+    );
 
     const itemsDirectus = respuesta.data;
     const total = respuesta.meta?.filter_count ?? itemsDirectus.length;
-    const totalPaginas = Math.max(1, Math.ceil(total / limite));
+
+    const limiteRespuesta = filtros.todos ? total : limite;
+    const paginaRespuesta = filtros.todos ? 1 : pagina;
+    const totalPaginas = Math.max(1, Math.ceil(total / (limiteRespuesta || 1)));
     const items = itemsDirectus.map((item) => this.transformarProducto(item));
 
-    return { items, pagina, limite, total, totalPaginas };
+    return {
+      items,
+      pagina: paginaRespuesta,
+      limite: limiteRespuesta,
+      total,
+      totalPaginas,
+    };
   }
 
   async obtenerPorSlug(slug: string): Promise<Producto> {
